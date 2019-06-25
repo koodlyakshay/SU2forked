@@ -236,6 +236,10 @@ void CTurbSolver::Viscous_Residual(CGeometry *geometry, CSolver **solver_contain
     if (config->GetKind_Turb_Model() == SST)
       numerics->SetF1blending(node[iPoint]->GetF1blending(), node[jPoint]->GetF1blending());
     
+    /*--- Set roughness height of the nearest wall (only for SA). ---*/
+    if (config->GetKind_Turb_Model() == SA)
+      numerics->SetRoughness(geometry->node[iPoint]->GetRoughnessHeight(),geometry->node[jPoint]->GetRoughnessHeight());
+    
     /*--- Compute residual, and Jacobians ---*/
     
     numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
@@ -1276,6 +1280,10 @@ void CTurbSASolver::Source_Residual(CGeometry *geometry, CSolver **solver_contai
       /*--- Set distance to the surface ---*/
           
       numerics->SetDistance(geometry->node[iPoint]->GetWall_Distance(), 0.0);
+      
+      /*--- Set the roughness of the closest wall. ---*/
+      
+      numerics->SetRoughness(geometry->node[iPoint]->GetRoughnessHeight(), 0.0 );
     
     } else {
     
@@ -1286,7 +1294,6 @@ void CTurbSASolver::Source_Residual(CGeometry *geometry, CSolver **solver_contai
     }
 
     /*--- Compute the source term ---*/
-    
     numerics->ComputeResidual(Residual, Jacobian_i, NULL, config);
 
     /*--- Store the intermittency ---*/
@@ -1339,7 +1346,16 @@ void CTurbSASolver::Source_Template(CGeometry *geometry, CSolver **solver_contai
 
 void CTurbSASolver::BC_HeatFlux_Wall(CGeometry *geometry, CSolver **solver_container, CNumerics *conv_numerics, CNumerics *visc_numerics, CConfig *config, unsigned short val_marker) {
   unsigned long iPoint, iVertex;
-  unsigned short iVar;
+  unsigned short iVar, iDim;
+  bool rough_wall = false;
+  su2double RoughWallBC, Roughness_Height;
+  su2double *Res_Wall = new su2double [nVar];
+  su2double *Normal, Area;
+  
+  string Marker_Tag = config->GetMarker_All_TagBound(val_marker);
+  
+  Roughness_Height = config->GetWall_RoughnessHeight(Marker_Tag);
+  if (Roughness_Height > 0.0 ) rough_wall = true;
   
   /*--- The dirichlet condition is used only without wall function, otherwise the
    convergence is compromised as we are providing nu tilde values for the
@@ -1353,7 +1369,8 @@ void CTurbSASolver::BC_HeatFlux_Wall(CGeometry *geometry, CSolver **solver_conta
       /*--- Check if the node belongs to the domain (i.e, not a halo node) ---*/
       
       if (geometry->node[iPoint]->GetDomain()) {
-        
+
+       if (!rough_wall) { 
         /*--- Get the velocity vector ---*/
         
         for (iVar = 0; iVar < nVar; iVar++)
@@ -1365,6 +1382,25 @@ void CTurbSASolver::BC_HeatFlux_Wall(CGeometry *geometry, CSolver **solver_conta
         /*--- Includes 1 in the diagonal ---*/
         
         Jacobian.DeleteValsRowi(iPoint);
+	   }
+	   else {
+		   /*--- Compute dual-grid area and boundary normal ---*/
+		   
+		   Normal = geometry->vertex[val_marker][iVertex]->GetNormal();
+		   
+		   Area = 0.0;
+		   for (iDim = 0; iDim < nDim; iDim++)
+		      Area += Normal[iDim]*Normal[iDim];
+		   Area = sqrt (Area);
+		   
+		   RoughWallBC = node[iPoint]->GetSolution(0)/(0.03*Roughness_Height);
+		   Res_Wall[0] = RoughWallBC*Area;
+		   LinSysRes.AddBlock(iPoint, Res_Wall);
+		   
+		   Jacobian_i[0][0] = Area/(0.03*Roughness_Height);
+		   Jacobian.AddBlock(iPoint,iPoint,Jacobian_i);
+	   }
+	   
       }
     }
   }

@@ -315,6 +315,7 @@ private:
   su2double *Outlet_Pressure;    /*!< \brief Specified back pressures (static) for outlet boundaries. */
   su2double *Isothermal_Temperature; /*!< \brief Specified isothermal wall temperatures (static). */
   su2double *Heat_Flux;  /*!< \brief Specified wall heat fluxes. */
+  su2double *Roughness_Height;  /*!< \brief Equivalent sand grain roughness for the marker. */
   su2double *Displ_Value;    /*!< \brief Specified displacement for displacement boundaries. */
   su2double *Load_Value;    /*!< \brief Specified force for load boundaries. */
   su2double *Damper_Constant;    /*!< \brief Specified constant for damper boundaries. */
@@ -1101,7 +1102,7 @@ private:
   unsigned short eig_val_comp;  /*!< \brief Parameter used to determine type of eigenvalue perturbation */
   su2double uq_urlx;            /*!< \brief Under-relaxation factor */
   bool uq_permute;              /*!< \brief Permutation of eigenvectors */
-
+  
   /*--- all_options is a map containing all of the options. This is used during config file parsing
    to track the options which have not been set (so the default values can be used). Without this map
    there would be no list of all the config file options. ---*/
@@ -1312,6 +1313,14 @@ private:
     assert(option_map.find(name) == option_map.end());
     all_options.insert(pair<string, bool>(name, true));
     COptionBase* val = new COptionStringDoubleList(name, list_size, string_field, double_field);
+    option_map.insert(pair<string, COptionBase *>(name, val));
+  }
+  
+  void addString2DoubleListOption(const string name, unsigned short & list_size, string * & string_field,
+                                 su2double* & double_field_1, su2double* & double_field_2) {
+    assert(option_map.find(name) == option_map.end());
+    all_options.insert(pair<string, bool>(name, true));
+    COptionBase* val = new COptionString2DoubleList(name, list_size, string_field, double_field_1, double_field_2);
     option_map.insert(pair<string, COptionBase *>(name, val));
   }
   
@@ -6777,6 +6786,13 @@ public:
    * \return The heat flux.
    */
   su2double GetWall_HeatFlux(string val_index);
+  
+  /*!
+   * \brief Get the wall roughness height on a wall boundary (Heatflux or Isothermal).
+   * \param[in] val_index - Index corresponding to the boundary.
+   * \return The wall roughness height.
+   */
+  su2double GetWall_RoughnessHeight(string val_marker);
 
   /*!
    * \brief Get the wall function treatment for the given boundary marker.

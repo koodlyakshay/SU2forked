@@ -121,6 +121,8 @@ public:
   Enthalpy_j;      /*!< \brief Enthalpy at point j. */
   su2double dist_i,  /*!< \brief Distance of point i to the nearest wall. */
   dist_j;      /*!< \brief Distance of point j to the nearest wall. */
+  su2double roughness_i, /*!< \brief Roughness of the wall nearest to point i. */
+  roughness_j; /*!< \brief Roughness of the wall nearest to point j. */
   su2double Temp_i,  /*!< \brief Temperature at point i. */
   Temp_j;      /*!< \brief Temperature at point j. */
   su2double *Temp_tr_i, /*!< \brief Temperature transl-rot at point i. */
@@ -532,6 +534,13 @@ public:
    * \param[in] val_dist_j - Value of of the distance from point j to the nearest wall.
    */
   void SetDistance(su2double val_dist_i, su2double val_dist_j);
+  
+  /*!
+   * \brief Set the value of the distance from the nearest wall.
+   * \param[in] val_dist_i - Value of of the distance from point i to the nearest wall.
+   * \param[in] val_dist_j - Value of of the distance from point j to the nearest wall.
+   */
+  void SetRoughness(su2double val_roughness_i, su2double val_roughness_j);
   
   /*!
    * \brief Set coordinates of the points.
@@ -4468,9 +4477,11 @@ private:
   su2double norm2_Grad;
   su2double dfv1, dfv2, dShat;
   su2double dr, dg, dfw;
+  su2double cr1;
   bool incompressible;
   bool rotating_frame;
   bool transition;
+  bool roughwall;
   su2double gamma_BC;
   su2double intermittency;
   su2double Production, Destruction, CrossProduction;

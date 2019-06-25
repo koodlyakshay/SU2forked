@@ -323,7 +323,7 @@ CSourcePieceWise_TurbSA::CSourcePieceWise_TurbSA(unsigned short val_nDim, unsign
   cb2   = 0.622;
   cb2_sigma = cb2/sigma;
   cw1 = cb1/k2+(1.0+cb2)/sigma;
-  
+  cr1 = 0.5;
 }
 
 CSourcePieceWise_TurbSA::~CSourcePieceWise_TurbSA(void) { }
@@ -341,6 +341,8 @@ void CSourcePieceWise_TurbSA::ComputeResidual(su2double *val_residual, su2double
 //  BC Transition Model variables
   su2double vmag, rey, re_theta, re_theta_t, re_v;
   su2double tu , nu_cr, nu_t, nu_BC, chi_1, chi_2, term1, term2, term_exponential;
+    
+  roughwall = (roughness_i > 0.0);
 
   if (incompressible) {
     Density_i = V_i[nDim+2];
@@ -383,11 +385,18 @@ void CSourcePieceWise_TurbSA::ComputeResidual(su2double *val_residual, su2double
     
     dist_i_2 = dist_i*dist_i;
     nu = Laminar_Viscosity_i/Density_i;
-    Ji = TurbVar_i[0]/nu;
+    
+    //roughness_i = 0 for smooth walls and Ji remains the same, changes only if roughness is specified.
+    Ji = TurbVar_i[0]/nu  + cr1*(roughness_i/dist_i);
     Ji_2 = Ji*Ji;
     Ji_3 = Ji_2*Ji;
+    
     fv1 = Ji_3/(Ji_3+cv1_3);
-    fv2 = 1.0 - Ji/(1.0+Ji*fv1);
+    
+    //Using a modified relation so as to not change the Shat that depends on fv2.
+    //fv2 = 1.0 - Ji/(1.0+Ji*fv1); 
+    fv2 = 1.0 - TurbVar_i[0]/(nu+TurbVar_i[0]*fv1);
+    
     ft2 = ct3*exp(-ct4*Ji_2);
     S = Omega;
     inv_k2_d2 = 1.0/(k2*dist_i_2);

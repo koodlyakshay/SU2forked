@@ -432,7 +432,7 @@ void CConfig::SetPointersNull(void) {
   Inlet_Velocity            = NULL;     Inflow_Mach                 = NULL;     Inflow_Pressure       = NULL;
   Exhaust_Pressure          = NULL;     Outlet_Pressure             = NULL;     Isothermal_Temperature= NULL;
   Heat_Flux                 = NULL;     Displ_Value                 = NULL;     Load_Value            = NULL;
-  FlowLoad_Value            = NULL;
+  FlowLoad_Value            = NULL;		Roughness_Height			= NULL;
 
   ElasticityMod             = NULL;     PoissonRatio                = NULL;     MaterialDensity       = NULL;
 
@@ -1119,10 +1119,10 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   addEnumListOption("INC_OUTLET_TYPE", nInc_Outlet, Kind_Inc_Outlet, Outlet_Map);
   /*!\brief MARKER_ISOTHERMAL DESCRIPTION: Isothermal wall boundary marker(s)\n
    * Format: ( isothermal marker, wall temperature (static), ... ) \ingroup Config  */
-  addStringDoubleListOption("MARKER_ISOTHERMAL", nMarker_Isothermal, Marker_Isothermal, Isothermal_Temperature);
+  addString2DoubleListOption("MARKER_ISOTHERMAL", nMarker_Isothermal, Marker_Isothermal, Isothermal_Temperature, Roughness_Height);
   /*!\brief MARKER_HEATFLUX  \n DESCRIPTION: Specified heat flux wall boundary marker(s)
    Format: ( Heat flux marker, wall heat flux (static), ... ) \ingroup Config*/
-  addStringDoubleListOption("MARKER_HEATFLUX", nMarker_HeatFlux, Marker_HeatFlux, Heat_Flux);
+  addString2DoubleListOption("MARKER_HEATFLUX", nMarker_HeatFlux, Marker_HeatFlux, Heat_Flux, Roughness_Height);
   /*!\brief MARKER_ENGINE_INFLOW  \n DESCRIPTION: Engine inflow boundary marker(s)
    Format: ( nacelle inflow marker, fan face Mach, ... ) \ingroup Config*/
   addStringDoubleListOption("MARKER_ENGINE_INFLOW", nMarker_EngineInflow, Marker_EngineInflow, EngineInflow_Target);
@@ -7186,6 +7186,7 @@ CConfig::~CConfig(void) {
   if (Outlet_Pressure != NULL)    delete[] Outlet_Pressure;
   if (Isothermal_Temperature != NULL)    delete[] Isothermal_Temperature;
   if (Heat_Flux != NULL)    delete[] Heat_Flux;
+  if (Roughness_Height != NULL)    delete[] Roughness_Height;
   if (Displ_Value != NULL)    delete[] Displ_Value;
   if (Load_Value != NULL)    delete[] Load_Value;
   if (Damper_Constant != NULL)    delete[] Damper_Constant;
@@ -8264,6 +8265,29 @@ su2double CConfig::GetWall_HeatFlux(string val_marker) {
   }
 
   return Heat_Flux[iMarker_HeatFlux];
+}
+
+su2double CConfig::GetWall_RoughnessHeight(string val_marker) {
+  unsigned short iMarker = 0;
+  short          flag = -1;
+
+  if (nMarker_HeatFlux > 0 || nMarker_Isothermal > 0) {
+  for (iMarker = 0; iMarker < nMarker_HeatFlux; iMarker++)
+    if (Marker_HeatFlux[iMarker] == val_marker) {
+		flag = iMarker;
+		break;
+	}
+  if (flag == -1) {
+	  for (iMarker = 0; iMarker < nMarker_Isothermal; iMarker++)
+      if (Marker_Isothermal[iMarker] == val_marker) {
+		flag = iMarker;
+		break;
+	}
+  }	
+  }
+  
+
+  return Roughness_Height[flag];
 }
 
 unsigned short CConfig::GetWallFunction_Treatment(string val_marker) {

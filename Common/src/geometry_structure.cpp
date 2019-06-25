@@ -11371,11 +11371,24 @@ void CPhysicalGeometry::ComputeWall_Distance(CConfig *config) {
       unsigned short markerID;
       unsigned long  elemID;
       int            rankID;
-      su2double      dist;
+      su2double      dist, roughness;
+      string         Marker_Tag;
       
       WallADT.DetermineNearestElement(node[iPoint]->GetCoord(), dist, markerID,
                                    elemID, rankID);
+	  /*--- Use the markerID to find the corresponding wall roughness height. ---*/
+	  
+	  Marker_Tag = config->GetMarker_All_TagBound(markerID);
+	  roughness = config->GetWall_RoughnessHeight(Marker_Tag);
+      
+      /*--- For the SA model, wall roughness is accounted by modifying the computed wall distance 
+       *                  d_new = d + 0.03 k_s
+       *    where k_s is the equivalent sand grain roughness height that is specified in cfg file.
+       *    For smooth walls, wall roughness is zero and computed wall distance remains the same. */
+       
+      dist = dist + 0.03*roughness; 
       node[iPoint]->SetWall_Distance(dist);
+      node[iPoint]->SetRoughnessHeight(roughness);
     }
   }
   

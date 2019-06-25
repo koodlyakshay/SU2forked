@@ -3246,6 +3246,66 @@ public:
   }
 };
 
+// Class where the option is represented by (String, su2double, su2double, string, su2double, su2double, ...)
+class COptionString2DoubleList : public COptionBase {
+  string name; // identifier for the option
+  unsigned short & size; // how many strings are there (same as number of su2doubles)
+
+  string * & s_f; // Reference to the string fields
+  su2double* & d_f1; // reference to the su2double fields
+  su2double* & d_f2; // reference to the su2double fields
+
+public:
+  COptionString2DoubleList(string option_field_name, unsigned short & list_size, string * & string_field, su2double* & double_field_1, su2double* & double_field_2) 
+                          : size(list_size), s_f(string_field), d_f1(double_field_1), d_f2(double_field_2) {
+    this->name = option_field_name;
+  }
+
+  ~COptionString2DoubleList() {};
+  string SetValue(vector<string> option_value) {
+    // number of entries must be multiple of three(same number of strings and doubles)
+    unsigned short totalVals = option_value.size();
+    if ((totalVals % 3) != 0) {
+      if ((totalVals == 1) && (option_value[0].compare("NONE") == 0)) {
+        // It's okay to say its NONE
+        this->size = 0;
+        return "";
+      }
+      string newstring;
+      newstring.append(this->name);
+      newstring.append(": must have three or a multiple of three entries");
+      return newstring;
+    }
+    unsigned short nVals = totalVals / 3;
+    this->size = nVals;
+    this->s_f = new string[nVals];
+    this->d_f1 = new su2double[nVals];
+    this->d_f2 = new su2double[nVals];
+
+    for (unsigned long i = 0; i < nVals; i++) {
+      this->s_f[i].assign(option_value[3*i]); // 3 because have su2double su2double and string
+      istringstream is1(option_value[3*i + 1]);
+      su2double val1;
+      if (!(is1 >> val1)) {
+        return badValue(option_value, "string su2double", this->name);
+      }
+      this->d_f1[i] = val1;
+      istringstream is2(option_value[3*i + 2]);
+      su2double val2;
+      if (!(is2 >> val2)) {
+        return badValue(option_value, "string su2double", this->name);
+      }
+      this->d_f2[i] = val2;
+    }
+    // Need to return something...
+    return "";
+  }
+
+  void SetDefault() {
+    this->size = 0; // There is no default value for list
+  }
+};
+
 class COptionInlet : public COptionBase {
   string name; // identifier for the option
   unsigned short & size;

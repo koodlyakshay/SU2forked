@@ -2351,7 +2351,7 @@ public:
   virtual void SetVortex_Tilting(su2double **PrimGrad_Flow, su2double* Vorticity, su2double LaminarViscosity);
 
   virtual su2double GetVortex_Tilting();
-  
+
   virtual void SetDynamic_Derivative(unsigned short iVar, su2double der);
 
   virtual void SetDynamic_Derivative_n(unsigned short iVar, su2double der);
@@ -4228,7 +4228,7 @@ public:
    * \return Value of the DES length Scale
    */
   su2double GetVortex_Tilting();
-  
+
 };
 
 /*!
