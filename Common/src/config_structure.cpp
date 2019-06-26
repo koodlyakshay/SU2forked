@@ -668,6 +668,7 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   default_body_force         = new su2double[3];
   default_sineload_coeff     = new su2double[3];
   default_nacelle_location   = new su2double[5];
+  default_roughness          = new su2double[1];
   
   /*--- All temperature polynomial fits for the fluid models currently
    assume a quartic form (5 coefficients). For example,
@@ -1119,10 +1120,15 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   addEnumListOption("INC_OUTLET_TYPE", nInc_Outlet, Kind_Inc_Outlet, Outlet_Map);
   /*!\brief MARKER_ISOTHERMAL DESCRIPTION: Isothermal wall boundary marker(s)\n
    * Format: ( isothermal marker, wall temperature (static), ... ) \ingroup Config  */
-  addString2DoubleListOption("MARKER_ISOTHERMAL", nMarker_Isothermal, Marker_Isothermal, Isothermal_Temperature, Roughness_Height);
+  addStringDoubleListOption("MARKER_ISOTHERMAL", nMarker_Isothermal, Marker_Isothermal, Isothermal_Temperature);
   /*!\brief MARKER_HEATFLUX  \n DESCRIPTION: Specified heat flux wall boundary marker(s)
    Format: ( Heat flux marker, wall heat flux (static), ... ) \ingroup Config*/
-  addString2DoubleListOption("MARKER_HEATFLUX", nMarker_HeatFlux, Marker_HeatFlux, Heat_Flux, Roughness_Height);
+  addStringDoubleListOption("MARKER_HEATFLUX", nMarker_HeatFlux, Marker_HeatFlux, Heat_Flux);
+  /*!\brief INC_INLET_TYPE \n DESCRIPTION: List of inlet types for incompressible flows. List length must match number of inlet markers. Options: VELOCITY_INLET, PRESSURE_INLET. \ingroup Config*/
+  addEnumListOption("WALL_TYPE", nWall_Types, Kind_Wall, WallType_Map);
+  /*!\brief Wall roughness height default value = 0 (smooth). \ingroup Config */
+  default_roughness[0] = 0.0;  //default_roughness[1] = 0.0;
+  addDoubleListOption("WALL_ROUGHNESS", nRoughWall, Roughness_Height);
   /*!\brief MARKER_ENGINE_INFLOW  \n DESCRIPTION: Engine inflow boundary marker(s)
    Format: ( nacelle inflow marker, fan face Mach, ... ) \ingroup Config*/
   addStringDoubleListOption("MARKER_ENGINE_INFLOW", nMarker_EngineInflow, Marker_EngineInflow, EngineInflow_Target);
@@ -4233,6 +4239,54 @@ void CConfig::SetPostprocessing(unsigned short val_software, unsigned short val_
     if ((Kind_ObjFunc[iObj] == SURFACE_PRESSURE_DROP) && (nMarker_Analyze != 2)) {
       SU2_MPI::Error("Must list two markers for the pressure drop objective function.\n Expected format: MARKER_ANALYZE= (outlet_name, inlet_name).", CURRENT_FUNCTION);
     }
+  }
+  
+  /*--- Check that if the wall roughness array are compatible and set deafult values if needed. ---*/
+  
+  if ((nMarker_HeatFlux > 0) || (nMarker_Isothermal > 0)) {
+    /*--- If the config option is not declared, then assume smooth walls and set roughness to zero. ---*/
+    if (nWall_Types != nMarker_HeatFlux + nMarker_Isothermal) {
+      if (nWall_Types == 0) {
+		  if (Roughness_Height != NULL) Roughness_Height = NULL;
+		  Roughness_Height = new su2double [nWall_Types];
+		  if (Kind_Wall != NULL) Kind_Wall = NULL;
+		  Kind_Wall = new unsigned short [nWall_Types];
+		  for (unsigned short iMarker = 0; iMarker < nMarker_HeatFlux; iMarker++) {
+			  Roughness_Height[iMarker] = 0.0;
+			  Kind_Wall[iMarker] = 1;
+		  }
+		  for (iMarker = 0; iMarker < nMarker_Isothermal; iMarker++) {
+			  Roughness_Height[nMarker_HeatFlux + iMarker] = 0.0;
+			  Kind_Wall[nMarker_HeatFlux + iMarker] = 1;
+		  }
+	  }
+	  else
+	  SU2_MPI::Error("Mismatch in number of wall markers.", CURRENT_FUNCTION);
+    }
+    
+    else {
+		if (nRoughWall != nWall_Types)
+		     SU2_MPI::Error("Mismatch in number of roughness height definition and wall type definition.", CURRENT_FUNCTION);
+		else {
+			su2double *temp_rough;
+			unsigned short *temp_kindrough;
+			temp_rough = new su2double [nWall_Types];
+			temp_kindrough = new unsigned short [nWall_Types];
+			for (unsigned short iMarker = 0; iMarker < nWall_Types; iMarker++) {
+				temp_rough[iMarker] = Roughness_Height[iMarker];
+				temp_kindrough[iMarker] = Kind_Wall[iMarker];
+			}
+			for (iMarker = 0; iMarker < nMarker_HeatFlux; iMarker++) {
+			  Roughness_Height[iMarker] = temp_rough[iMarker];
+			  Kind_Wall[iMarker] = temp_kindrough[iMarker];
+		  }
+		  for (iMarker = 0; iMarker < nMarker_Isothermal; iMarker++) {
+			  Roughness_Height[nMarker_HeatFlux + iMarker] = temp_rough[nMarker_HeatFlux + iMarker];
+			  Kind_Wall[nMarker_HeatFlux + iMarker] = temp_kindrough[nMarker_HeatFlux + iMarker];
+		  }
+		}
+	}
+    
   }
   
   /*--- Handle default options for topology optimization ---*/
@@ -8285,10 +8339,31 @@ su2double CConfig::GetWall_RoughnessHeight(string val_marker) {
 	}
   }	
   }
-  
-
   return Roughness_Height[flag];
 }
+
+unsigned short CConfig::GetKindWall(string val_marker) {
+  unsigned short iMarker;
+  short flag = -1;
+  for (iMarker = 0; iMarker < nMarker_HeatFlux; iMarker++)
+    if (Marker_HeatFlux[iMarker] == val_marker) {
+		flag = iMarker;
+		break;
+	}
+  if (flag == -1)
+   for (iMarker = 0; iMarker < nMarker_Isothermal; iMarker++)
+    if (Marker_Isothermal[iMarker] == val_marker) {
+		flag = iMarker;
+		break;
+	}
+  if (flag == -1) return 1;
+  else return Kind_Wall[flag];
+}
+
+void CConfig::SetWall_RoughnessHeight(string val_marker, su2double val_roughness) {
+	//Roughness_Height[val_marker] = val_roughness;
+}
+
 
 unsigned short CConfig::GetWallFunction_Treatment(string val_marker) {
   unsigned short WallFunction = NO_WALL_FUNCTION;

@@ -1355,8 +1355,8 @@ void CTurbSASolver::BC_HeatFlux_Wall(CGeometry *geometry, CSolver **solver_conta
   string Marker_Tag = config->GetMarker_All_TagBound(val_marker);
   
   Roughness_Height = config->GetWall_RoughnessHeight(Marker_Tag);
-  if (Roughness_Height > 0.0 ) rough_wall = true;
-  
+  //if (Roughness_Height > 0.0 ) rough_wall = true;
+  if (config->GetKindWall(Marker_Tag) == ROUGH ) rough_wall = true;
   /*--- The dirichlet condition is used only without wall function, otherwise the
    convergence is compromised as we are providing nu tilde values for the
    first point of the wall  ---*/
@@ -1395,10 +1395,10 @@ void CTurbSASolver::BC_HeatFlux_Wall(CGeometry *geometry, CSolver **solver_conta
 		   
 		   RoughWallBC = node[iPoint]->GetSolution(0)/(0.03*Roughness_Height);
 		   Res_Wall[0] = RoughWallBC*Area;
-		   LinSysRes.AddBlock(iPoint, Res_Wall);
+		   LinSysRes.SubtractBlock(iPoint, Res_Wall);
 		   
 		   Jacobian_i[0][0] = Area/(0.03*Roughness_Height);
-		   Jacobian.AddBlock(iPoint,iPoint,Jacobian_i);
+		   Jacobian.SubtractBlock(iPoint,iPoint,Jacobian_i);
 	   }
 	   
       }

@@ -546,6 +546,8 @@ private:
   unsigned short Kind_SGS_Model;                        /*!< \brief LES SGS model definition. */
   unsigned short Kind_Trans_Model,			/*!< \brief Transition model definition. */
   Kind_ActDisk, Kind_Engine_Inflow, Kind_Inlet, *Kind_Inc_Inlet, *Kind_Inc_Outlet, *Kind_Data_Riemann, *Kind_Data_Giles;           /*!< \brief Kind of inlet boundary treatment. */
+  unsigned short *Kind_Wall;    /*!< \brief Type of wall treatment. */
+  unsigned short nWall_Types;  /*!< \brief Number of wall treatment types listed. */
   unsigned short nInc_Inlet;  /*!< \brief Number of inlet boundary treatment types listed. */
   unsigned short nInc_Outlet;  /*!< \brief Number of inlet boundary treatment types listed. */
   su2double Inc_Inlet_Damping;  /*!< \brief Damping factor applied to the iterative updates to the velocity at a pressure inlet in incompressible flow. */
@@ -935,7 +937,8 @@ private:
   nPlunging_Ampl_Z,           /*!< \brief Number of Plunging amplitudes in the z-direction. */
   nOmega_HB,                /*!< \brief Number of frequencies in Harmonic Balance Operator. */
   nMoveMotion_Origin,         /*!< \brief Number of motion origins. */
-  *MoveMotion_Origin;         /*!< \brief Keeps track if we should move moment origin. */
+  *MoveMotion_Origin,         /*!< \brief Keeps track if we should move moment origin. */
+  nRoughWall;                 /*!< \brief Number of walls. */
   vector<vector<vector<su2double> > > Aeroelastic_np1, /*!< \brief Aeroelastic solution at time level n+1. */
   Aeroelastic_n,              /*!< \brief Aeroelastic solution at time level n. */
   Aeroelastic_n1;             /*!< \brief Aeroelastic solution at time level n-1. */
@@ -1029,7 +1032,8 @@ private:
   *default_ffd_axis,          /*!< \brief Default FFD axis for the COption class. */
   *default_inc_crit,          /*!< \brief Default incremental criteria array for the COption class. */
   *default_extrarelfac,       /*!< \brief Default extra relaxation factor for Giles BC in the COption class. */
-  *default_sineload_coeff;    /*!< \brief Default values for a sine load. */
+  *default_sineload_coeff,    /*!< \brief Default values for a sine load. */
+  *default_roughness;         /*!< \brief Default values for wall roughness. */
   unsigned short nSpanWiseSections; /*!< \brief number of span-wise sections */
   unsigned short nSpanMaxAllZones; /*!< \brief number of maximum span-wise sections for all zones */
   unsigned short *nSpan_iZones;  /*!< \brief number of span-wise sections for each zones */
@@ -1315,15 +1319,7 @@ private:
     COptionBase* val = new COptionStringDoubleList(name, list_size, string_field, double_field);
     option_map.insert(pair<string, COptionBase *>(name, val));
   }
-  
-  void addString2DoubleListOption(const string name, unsigned short & list_size, string * & string_field,
-                                 su2double* & double_field_1, su2double* & double_field_2) {
-    assert(option_map.find(name) == option_map.end());
-    all_options.insert(pair<string, bool>(name, true));
-    COptionBase* val = new COptionString2DoubleList(name, list_size, string_field, double_field_1, double_field_2);
-    option_map.insert(pair<string, COptionBase *>(name, val));
-  }
-  
+   
   void addInletOption(const string name, unsigned short & nMarker_Inlet, string * & Marker_Inlet,
                       su2double* & Ttotal, su2double* & Ptotal, su2double** & FlowDir) {
     assert(option_map.find(name) == option_map.end());
@@ -5023,6 +5019,17 @@ public:
   unsigned short GetKind_ActDisk(void);
   
   /*!
+   * \brief Get the kind of wall.
+   * \return Kind of wall - smooth or rough.
+   */
+  unsigned short GetKindWall(string val_marker);
+  
+  /*!
+   * \brief Set the kind of wall - rough or smooth.
+   */
+  void SetKindWall(string val_marker, unsigned short val_kindwall);
+  
+  /*!
    * \brief Get the number of sections.
    * \return Number of sections
    */
@@ -6793,6 +6800,13 @@ public:
    * \return The wall roughness height.
    */
   su2double GetWall_RoughnessHeight(string val_marker);
+  
+  /*!
+   * \brief Get the wall roughness height on a wall boundary (Heatflux or Isothermal).
+   * \param[in] val_index - Index corresponding to the boundary.
+   * \return The wall roughness height.
+   */
+  void SetWall_RoughnessHeight(string val_marker, su2double val_roughness);
 
   /*!
    * \brief Get the wall function treatment for the given boundary marker.
