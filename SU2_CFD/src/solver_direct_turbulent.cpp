@@ -1352,6 +1352,7 @@ void CTurbSASolver::BC_HeatFlux_Wall(CGeometry *geometry, CSolver **solver_conta
   string Marker_Tag = config->GetMarker_All_TagBound(val_marker);
   
   Roughness_Height = config->GetWall_RoughnessHeight(Marker_Tag);
+  
   //if (Roughness_Height > 0.0 ) rough_wall = true;
   if (config->GetKindWall(Marker_Tag) == ROUGH ) rough_wall = true;
   /*--- The dirichlet condition is used only without wall function, otherwise the
@@ -3639,9 +3640,18 @@ void CTurbSSTSolver::Source_Template(CGeometry *geometry, CSolver **solver_conta
 void CTurbSSTSolver::BC_HeatFlux_Wall(CGeometry *geometry, CSolver **solver_container, CNumerics *conv_numerics, CNumerics *visc_numerics, CConfig *config, unsigned short val_marker) {
   
   unsigned long iPoint, jPoint, iVertex, total_index;
-  unsigned short iDim, iVar;
+  unsigned short iDim, iVar, jDim;
   su2double distance, density = 0.0, laminar_viscosity = 0.0, beta_1;
+  bool rough_wall = false;
+  su2double RoughWallBC, Roughness_Height, S_R, WallDistMod, FrictionVel, div_vel, Area, kPlus;
+  string Marker_Tag = config->GetMarker_All_TagBound(val_marker);
+  su2double WallShearStress, TauNormal, Tau[3][3] = {{0.0, 0.0, 0.0},{0.0, 0.0, 0.0},{0.0, 0.0, 0.0}},
+            Grad_Vel[3][3] = {{0.0, 0.0, 0.0},{0.0, 0.0, 0.0},{0.0, 0.0, 0.0}},TauElem[3] = {0.0, 0.0, 0.0}, 
+            TauTangent[3] = {0.0, 0.0, 0.0}, delta[3][3] = {{1.0, 0.0, 0.0},{0.0,1.0,0.0},{0.0,0.0,1.0}}, *UnitNormal;
+    UnitNormal = new su2double [nDim];
   
+  if (config->GetKindWall(Marker_Tag) == ROUGH ) rough_wall = true;
+   
   for (iVertex = 0; iVertex < geometry->nVertex[val_marker]; iVertex++) {
     iPoint = geometry->vertex[val_marker][iVertex]->GetNode();
     
@@ -3667,6 +3677,64 @@ void CTurbSSTSolver::BC_HeatFlux_Wall(CGeometry *geometry, CSolver **solver_cont
       Solution[0] = 0.0;
       Solution[1] = 60.0*laminar_viscosity/(density*beta_1*distance*distance);
       
+      if (rough_wall) {
+          
+          geometry->vertex[val_marker][iVertex]->GetNormal(UnitNormal);
+          Area = 0.0;
+          for (iDim = 0; iDim < nDim; iDim++) Area += UnitNormal[iDim]*UnitNormal[iDim];
+          Area = sqrt(Area);
+          for (iDim = 0; iDim < nDim; iDim++) UnitNormal[iDim] = UnitNormal[iDim]/Area;
+          
+		  Roughness_Height = config->GetWall_RoughnessHeight(Marker_Tag);
+		  
+		  /*--- Evaluate Tau ---*/
+		  for (iDim = 0; iDim < nDim; iDim++)
+		     for (jDim = 0 ; jDim < nDim; jDim++)
+		        Grad_Vel[iDim][jDim] = solver_container[FLOW_SOL]->node[iPoint]->GetGradient_Primitive(iDim+1, jDim);
+          
+          div_vel = 0.0; for (iDim = 0; iDim < nDim; iDim++) div_vel += Grad_Vel[iDim][iDim];
+        
+          for (iDim = 0; iDim < nDim; iDim++) {
+            for (jDim = 0 ; jDim < nDim; jDim++) {
+              Tau[iDim][jDim] = laminar_viscosity*(Grad_Vel[jDim][iDim] + Grad_Vel[iDim][jDim]) - TWO3*laminar_viscosity*div_vel*delta[iDim][jDim];
+            }
+          }
+          
+          /*--- Compute wall shear stress (using the stress tensor). Compute wall skin friction coefficient, and heat flux on the wall ---*/
+        
+          TauNormal = 0.0; for (iDim = 0; iDim < nDim; iDim++) TauNormal += TauElem[iDim] * UnitNormal[iDim];
+        
+          WallShearStress = 0.0;
+          for (iDim = 0; iDim < nDim; iDim++) {
+            TauTangent[iDim] = TauElem[iDim] - TauNormal * UnitNormal[iDim];
+            WallShearStress += TauTangent[iDim] * TauTangent[iDim];
+          }
+          WallShearStress = sqrt(WallShearStress);
+        
+          /*--- Compute non-dimensional velocity ---*/
+          FrictionVel = sqrt(fabs(WallShearStress)/density);
+          
+          /*--- Compute roughness in wall units. ---*/
+          kPlus = FrictionVel*Roughness_Height*density/laminar_viscosity;
+          
+          /*--- Reference 1 from Sandia and Aupoix ---*/
+          /*if (kPlus <= 25) 
+              S_R = (50/(kPlus+EPS))*(50/(kPlus+EPS));
+          else
+              S_R = 100/(kPlus+EPS);*/
+          
+          /*--- Reference 2 from D.C. Wilcox Turbulence Modeling for CFD ---*/
+          if (kPlus <= 5) 
+              S_R = (200/(kPlus+EPS))*(200/(kPlus+EPS));
+          else
+              S_R = 100/(kPlus+EPS) + ((200/(kPlus+EPS))*(200/(kPlus+EPS)) - 100/(kPlus+EPS))*exp(5-kPlus);
+          
+          
+         /*--- Modify the omega to account for a rough wall. ---*/
+          Solution[1] = FrictionVel*FrictionVel*S_R/(laminar_viscosity/density);
+          
+	  }
+      
       /*--- Set the solution values and zero the residual ---*/
       node[iPoint]->SetSolution_Old(Solution);
       node[iPoint]->SetSolution(Solution);
@@ -3680,6 +3748,8 @@ void CTurbSSTSolver::BC_HeatFlux_Wall(CGeometry *geometry, CSolver **solver_cont
       
     }
   }
+  
+  delete [] UnitNormal;
   
 }
 
